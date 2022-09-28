@@ -1,0 +1,541 @@
+\documentclass[11pt]{article}
+\usepackage{alltt}
+    \title{\textbf{Declarative Computation Model}}
+    \author{Rokas Gegevičius}
+    \date{\today}
+    
+    \addtolength{\topmargin}{-3cm}
+    \addtolength{\textheight}{3cm}
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\section*{Exercises}
+\begin{enumerate}
+
+\item Free and bound identiﬁers. Consider the following statement:
+
+\begin{verbatim}
+proc {P X}
+    if X>0 then {P X-1} end
+end
+\end{verbatim}
+ 
+Is the second occurrence of the identiﬁer {\bfseries P} free or bound?
+\\\\
+{\bfseries Solution}: let's translate it to the kernel syntax:
+\begin{verbatim}
+local P in
+    local X in
+        P=proc{$ X}
+            local T in
+                if T then {P X-1} end
+            end
+        end
+    end
+end          
+\end{verbatim}
+
+{\bfseries P} is bound to the procedure.
+
+\item {\itshape Contextual environment}. Consider the following statement:
+\begin{verbatim}
+declare MulByN N in
+N=3
+proc {MulByN X ?Y}
+    Y=N*X
+end
+\end{verbatim}
+together with the call \{MulByN $A$ $B$\} . Assume that the environment at the call
+contains \{ $A \rightarrow 10, B\rightarrow x_1 $\}. When the procedure body is executed, the mapping \{$N\rightarrow3$\} is added to the environment. Why is this a necessary step? In particular, would
+not \{$N\rightarrow3$\} already exist somewhere in the environment at the call? Would not this
+be enough to ensure that the identiﬁer $N$ already maps to 3? 
+
+Give an example where $N$ does not exist in the environment at the call. Then give a second example where
+$N$ does exist there, but is bound to a diﬀerent value than 3.
+
+{\bfseries Solution}: according to the procedure definition, they carrier their own contextual environment 
+
+\( (\;\mathbf{proc} \; \{\$\; \langle y\rangle_1 \; ,..., \langle y\rangle_n\} \; \langle s\rangle \; \mathbf{end}, \; CE ) \;\)
+ 
+with all the mappings of identifiers to the store to ensure vaidation of lexical scoping rules.
+This is because a procedure that works when it is deﬁned will continue to work, independent of the environment where it is called. 
+
+Examples:
+
+\begin{itemize}
+
+\item $N$ does exist in the environment at the procedure call
+\begin{verbatim}
+local MulByN in
+    local N in
+       N=3
+       proc {MulByN X ?Y}
+           Y=N*X
+       end
+    end   
+    {Browse {MulByN 10}} % prints 30
+    {Browse N} % error does not exist
+end
+\end{verbatim}
+
+\item $N$ does not exist in the environment at the call
+\begin{verbatim}
+local MulByN N in
+    N=3
+    proc {MulByN X ?Y}
+        Y=N*X
+    end
+    {Browse N} % prints 3
+    {Browse {MulByN 10}} % prints 30
+end
+\end{verbatim}
+\end{itemize}
+
+\newpage
+\item {\itshape Functions and procedures}. If a function body has an if statement with a missing
+else case, then an exception is raised if the if condition is false. Explain why this
+behavior is correct. This situation does not occur for procedures. Explain why not.
+\\\\
+{\bfseries Solution}:
+
+procedure definition:
+\( \;\mathbf{proc} \; \{\$\; \langle X\rangle_1 \; ,..., \langle X\rangle_n\} \; \langle statement\rangle \; \mathbf{end} \;\)
+
+function definition:
+\( \;\mathbf{fun} \; \{\$\; \langle X\rangle_1 \; ,..., \langle X\rangle_n\} \; \langle statement\rangle \; \langle expression\rangle \; \mathbf{end} \;\)
+
+\begin{verbatim}
+local F in
+    fun {F X}
+        if X==0 then 0 else 1 end
+    end
+end
+\end{verbatim}
+
+according to the function definition, it must end with an expression. If the else-case is missing and the if-condition is false, there is no expression at the end - raising an exception makes sense
+
+\begin{verbatim}
+local F in
+    proc {F X ?R}
+        if X==0 then R=0 else R=1 end
+    end
+end
+\end{verbatim}
+
+according to the definition of the procedure, it must end with a statement. If the else-case is missing and the if-condition is false, the R identifier will be unbound.
+
+\item {\itshape The if and case statements}. This exercise explores the relationship between the if statement and the case statement.
+
+\begin{enumerate}
+\item Deﬁne the if statement in terms of the case statement. This shows that
+the conditional does not add any expressiveness over pattern matching. It could
+have been added as a linguistic abstraction.
+\item Deﬁne the case statement in terms of the if statement, using the operations Label , Arity , and '.' (feature selection).
+\end{enumerate}
+
+This shows that the if statement is essentially a more primitive version of the case
+statement.
+
+
+\newpage {\bfseries Solution}:
+\\(a) part
+\begin{verbatim}
+local Test
+    fun {Test X}
+        case X of 0 then 1
+        else 0
+        end
+    end
+in    
+    {Browse {Test 0}} % prints 1
+    {Browse {Test 1}} % prints 0
+end   
+\end{verbatim}
+(b) part
+\begin{verbatim}
+local
+    R=test(x:value1 y:value2 z:value3)
+in
+    if {Label R}\=test then skip
+    else if {Arity R}\=[x y z] then skip
+        else if R.x == R.y then skip
+            else {Browse 'Success: all cases were false'} end
+        end 
+    end
+end
+\end{verbatim}
+
+\item {\itshape The {\bfseries case} statement}. This exercise tests your understanding of the full case
+statement. Given the following procedure:
+\begin{verbatim}
+proc {Test X}
+    case X
+    of a|Z then {Browse 'case'(1)}
+    [] f(a) then {Browse 'case'(2)}
+    [] Y|Z andthen Y==Z then {Browse 'case'(3)}
+    [] Y|Z then {Browse 'case'(4)}
+    [] f(Y) then {Browse 'case'(5)}
+    else {Browse 'case'(6)} end
+end
+\end{verbatim}
+
+Without executing any code, predict what will happen when you feed
+\begin{verbatim}
+{Test [b c a]}, {Test f(b(3))}, {Test f(a)}, {Test f(a(3))}, 
+{Test f(d)}, {Test [a b c]}, {Test [c a b]}, {Test a|a}, 
+and {Test '|'(a b c)}.
+\end{verbatim}
+
+\newpage
+{\bfseries Solution}:
+\begin{alltt}
+{Test [b c a]} \(\to\) case(4)
+{Test f(b(3))} \(\to\) case(5) 
+{Test f(a)}    \(\to\) case(2)
+{Test f(a(3))} \(\to\) case(5) 
+{Test f(d)}    \(\to\) case(5) 
+{Test [a b c]} \(\to\) case(1)
+{Test [c a b]} \(\to\) case(4) 
+{Test a|a},    \(\to\) case(1) 
+{Test'|'(a b c)} \(\to\) case(6)
+\end{alltt}
+
+\item {\itshape The {\bfseries case} statement again}. Given the following procedure:
+\begin{verbatim}
+proc {Test X}
+    case X of f(a Y c) then {Browse 'case'(1)}
+    else {Browse 'case'(2)} end
+end
+\end{verbatim}
+Without executing any code, predict what will happen when you feed:
+\begin{verbatim}
+declare X Y {Test f(X b Y)}
+
+declare X Y {Test f(a Y d)}
+
+declare X Y {Test f(X Y d)}
+\end{verbatim}
+Use the kernel translation and the semantics if necessary to make the predictions.
+After making the predictions, check your understanding by running the examples
+in Mozart. Now run the following example:
+\begin{verbatim}
+declare X Y
+if f(X Y d)==f(a Y c) then {Browse 'case'(1)}
+else {Browse 'case'(2)} end
+\end{verbatim}
+Does this give the same result or a different result than the previous example?
+Explain the result.
+
+{\bfseries Solution}: conditionals, pattern machings and procedure aplications are suspendable statements
+
+\begin{verbatim}
+declare X Y {Test f(X b Y)}
+declare X Y {Test f(X Y d)}
+\end{verbatim}
+at call X is unbound execution suspended - waiting for X to be bound
+\\
+\begin{verbatim}
+declare X Y {Test f(a Y d)}
+\end{verbatim}
+'case'(2)
+
+\begin{verbatim}
+if f(X Y d)==f(a Y c) then {Browse 'case'(1)}
+\end{verbatim}
+different result
+\begin{alltt}
+declare X Y {Test f(X b Y)} \(\to\) 'case'(2)
+declare X Y {Test f(a Y d)} \(\to\) 'case'(2)
+declare X Y {Test f(X Y d)} \(\to\) 'case'(2)
+\end{alltt}
+
+X is unbound, but no matter what value it gets, these tuples are not equal: conditional can be evaluated
+
+\item {\itshape Lexically scoped closures}. Given the following code:
+\begin{verbatim}
+declare Max3 Max5
+proc {SpecialMax Value ?SMax}
+    fun {SMax X}
+        if X>Value then X else Value end
+    end
+end
+{SpecialMax 3 Max3}
+{SpecialMax 5 Max5}
+\end{verbatim}
+Without executing any code, predict what will happen when you feed:
+\begin{verbatim}
+{Browse [{Max3 4} {Max5 4}]}
+\end{verbatim}
+{\bfseries Solution}: [4, 5] Hint:procedure aplication is a suspendable statment
+
+\item {\itshape Control abstraction}. This exercise explores the relationship between linguistic
+abstractions and higher-order programming.
+\begin{enumerate}
+\item Deﬁne the function AndThen as follows:
+
+\begin{verbatim}
+fun {AndThen BP1 BP2}
+    if {BP1} then {BP2} else false end
+end
+\end{verbatim}
+
+Does the call
+\begin{alltt}
+\{AndThen fun \{$\} \(\langle{expression}\rangle\sb{1}\) end fun \{$\} \(\langle{expression}\rangle\sb{2}\) end\}
+\end{alltt}
+give the same result as \(\langle{expression}\rangle_1\) {\bfseries andthen} \(\langle{expression}\rangle_2\)? Does it avoid the evaluation of \(\langle{expression}\rangle_1\) in the same situations?
+
+\item Write a function OrElse that is to {\bfseries orelse} as AndThen is to {\bfseries andthen}. Explain its behavior.
+\end{enumerate}
+
+{\bfseries Solution}: The ability to pass functions as arguments is known as higher-order programming
+\\\\
+(a) part
+\begin{verbatim}
+local
+    fun{AndThen BP1 BP2}
+        if {BP1} then {BP2} else false end
+    end
+in    
+    {Browse {AndThen fun {$} a==a end fun{$} 'success' end}} 
+    % prints success
+end    
+\end{verbatim}
+is the same as
+\begin{verbatim}
+local
+    fun {Test}
+        a==a andthen 'success'
+    end
+in    
+    {Browse {Test}} % prints success
+end    
+\end{verbatim}
+
+\(\langle{expression}\rangle_2\) is not evaluated if \(\langle{expression}\rangle_1\) is false
+\\\\
+(b) part
+
+\begin{verbatim}
+local
+    fun{OrElse BP1 BP2}
+        if {BP1} then true else {BP2} end
+    end
+in    
+    {Browse {OrElse fun {$} a==b end fun{$} 'success' end}} 
+    % prints success
+end    
+\end{verbatim}
+\newpage
+is the same as
+\begin{verbatim}
+local
+    fun {Test}
+        a==b orelse 'success'
+    end
+in    
+    {Browse {Test}} % prints success
+end    
+\end{verbatim}
+\(\langle{expression}\rangle_2\) is not evaluated if \(\langle{expression}\rangle_1\) is true
+
+\item {\itshape Tail recursion}. This exercise examines the importance of tail recursion, in the
+light of the semantics given in the chapter. Consider the following two functions:
+\begin{verbatim}
+fun {Sum1 N}
+    if N==0 then 0 else N+{Sum1 N-1} end
+end
+
+fun {Sum2 N S}
+    if N==0 then S else {Sum2 N-1 N+S} end
+end
+\end{verbatim}
+Now do the following:
+\begin{enumerate}
+\item Expand the two deﬁnitions into kernel syntax. It should be clear that {\bfseries Sum2}
+is tail recursive and {\bfseries Sum1} is not.
+\item Execute the two calls \{Sum1 10\} and \{Sum2 10 0\} by hand, using the
+semantics of this chapter to follow what happens to the stack and the store.
+How large does the stack become in either case?
+\item What would happen in the Mozart system if you would call \{Sum1
+100000000\} or \{Sum2 100000000 0\}? Which one is likely to work? Which
+one is not? Try both on Mozart to verify your reasoning.
+\end{enumerate}
+
+\newpage {\bfseries Solution}: (a)
+\begin{verbatim}
+local Sum1 in
+    Sum1 = proc {$ N ?R}
+        if N==0 then R=0 
+        else local N1 in
+                 N1=N-1
+                 local R1 in
+                     {Sum1 N1 R1}
+                         R=N+R1
+            end
+         end
+      end
+   end    
+end                                     
+
+local Sum2 in
+    Sum2 = proc {$ N S ?R}
+        if N==0 then R=S else
+                         local N1 in
+                         N1=N-1
+                             local S1 in
+                                 S1=S+N
+                                 R={Sum2 N1 S1}
+                             end
+                         end
+                     end    
+                 end
+             end                
+\end{verbatim}
+(b)\\\\
+\{Sum1 10\}\\\\
+\(([\{Sum1\;N1\;R1\}\{N\to n_0,\;R\to r_0,\;N1\to n_1,\;R1\to r_1\}] \\
+\left[\{R = N + R1\}\{N\to n_1,\;R\to r_1,\;N1\to n_2,\;R1\to r_2\}\right] \\	
+\left[\{R = N + R1\}\{N\to n_2,\;R\to r_2,\;N1\to n_3,\;R1\to r_3\}\right] \\
+\left[\{R = N + R1\}\{N\to n_3,\;R\to r_2,\;N1\to n_4,\;R1\to r_4\}\right] \\
+...\\
+\left[\{R = N + R1\}\{N\to n_9,\;R\to r_9,\;N1\to n_{10},\;R1\to r_{10}\}\right]\\								
+\{n_0=10,...,n_{10}=0, r_0,...,r_{10}=0 \})
+\) \\\\
+stack grows with every recursive call!
+
+\newpage
+\{Sum2 10 0\}\\\\
+\(([\{Sum2\;N1\;S1\}\{N\to n_0,\;S\to s_0,\;R\to r_0\;N1\to n_1,\;S1\to s_1\}] \\ \)
+\(([\{Sum2\;N1\;S1\}\{N\to n_1,\;S\to s_1,\;R\to r_1\;N1\to n_2,\;S1\to s_2\}] \\ \)
+...\\
+\(([\{Sum2\;N1\;S1\}\{N\to n_9,\;S\to s_9,\;R\to r_9\;N1\to n_{10},\;S1\to s_{10}\}] \\ 
+\{n_0=10,...,n_{10}=0,n_{11}, s_0 = 0,...,s_{10}, s_{11}\})\)
+\\\\
+last call optimisation - constant stack size
+
+(c)
+\\\\
+\{Sum1 100000000\}: \\ stack grows with every recursive call, will exhaust allowed memory
+
+\{Sum2 100000000 0\}: \\ tail recursion, constant stack, will return result
+
+\item {\itshape Expansion into kernel syntax}. Consider the following function {\itshape SMerge} that
+merges two sorted lists:
+\begin{verbatim}
+fun {SMerge Xs Ys}
+    case Xs#Ys
+    of nil#Ys then Ys
+    [] Xs#nil then Xs
+    [] (X|Xr)#(Y|Yr) then
+        if X=<Y then X|{SMerge Xr Ys}
+        else Y|{SMerge Xs Yr} end
+    end
+end        
+\end{verbatim}
+Expand {\itshape SMerge} into the kernel syntax.
+\\\\
+{\bfseries Solution}:
+\begin{verbatim}
+local SMerge in
+    SMerge = proc {$ Xs Ys ?R}
+        case Xs of nil then R=Ys
+        else
+            case Ys of nil then R=Xs
+            else
+                case Xs of X|Xr then
+                    case Ys of Y|Yr then
+                        if X=<Y then R=X|{SMerge Xr Ys}
+                        else R=Y|{Smerge Xs Yr} end
+                    end
+                end
+            end
+        end
+    end    
+end                
+\end{verbatim}
+
+\item {\itshape Mutual recursion}. Last call optimization is important for much more than just
+recursive calls. Consider the following mutually recursive deﬁnition of the functions
+{\itshape IsOdd} and {\itshape IsEven} :
+\begin{verbatim}
+fun {IsEven X}
+    if X==0 then true else {IsOdd X-1} end
+end    
+fun {IsOdd X} 
+    if X==0 then false else {IsEven X-1} end
+end
+\end{verbatim}
+These functions are mutually recursive since each function calls the
+other. Mutual recursion can be generalized to any number of functions. A set of
+functions is mutually recursive if they can be put in a sequence such that each
+function calls the next and the last calls the ﬁrst. Show that
+the calls {\itshape \{IsOdd N\}} and {\itshape \{IsEven N\}} execute with constant 
+stack size for all non-negative {\itshape N}.
+
+{\bfseries Sulution}:\\
+\(([\{IsEven\;X1\}\{X\to x_n, X1\to x_{n+1}\}] \\ \)
+\(([\{IsOdd\;X1\}\{X\to x_{n+1}, X1\to x_{n+2}\}] \\ \)
+...\\
+...\\
+\(([\{IsEven\;X1\}\{X\to x_{n+k}, X1\to x_{n+(k+1)}\}] \\ \) 
+
+In general, if each function in a mutually recursive set has just one
+function call in its body, and this function call is a last call, then 
+all functions in the set will execute with their stack size bounded by a constant.
+
+\item {\itshape Exceptions with a finally clause}. Section 2.7 shows how to deﬁne the
+{\bfseries try / finally} statement by translating it into a {\bfseries try / catch} statement. For this
+exercise, deﬁne another translation of
+\begin{alltt}
+try \({\langle{s}\rangle}\sb{1}\) finally \({\langle{s}\rangle}\sb{2}\) end
+\end{alltt}
+in which \({\langle{s}\rangle}\sb{1}\) and \({\langle{s}\rangle}\sb{2}\) only occur once. {\itshape Hint}: it needs a boolean variable.
+\newpage
+{\bfseries Solution}:
+\begin{alltt}
+local Boolean E in
+    try 
+        \({\langle{s}\rangle}\sb{1}\)
+        catch X then E=X Boolean=true end
+        \({\langle{s}\rangle}\sb{2}\)
+        if Boolean==true then raise E end
+    end
+end
+\end{alltt}
+
+\item {\itshape Uniﬁcation}. Section 2.8.2 explains that the bind operation is actually much
+more general than just binding variables: it makes two partial values equal (if they
+are compatible). This operation is called uniﬁcation. The purpose of this exercise is
+to explore why uniﬁcation is interesting. Consider the three uniﬁcations \(X=[a\;Z],\;
+Y=[W\;b]\) and \(X=Y\). Show that the variables \(X, Y, Z,\) and \(W\) are bound to the same
+values, no matter in which order the three uniﬁcations are done.
+
+{\bfseries Solution}:
+\begin{verbatim}
+declare R1 R2
+
+local X Y W Z in
+    X=[a Z]
+    Y=[W b]
+    X=Y
+    R1=[X Y W Z]
+end
+
+local X Y W Z in
+    Y=[W b]
+    X=Y
+    X=[a Z]
+    R2=[X Y W Z]
+end
+
+{Browse R1==R2}
+{Browse R1#R2}
+\end{verbatim}
+\(X, Y, Z,\) and \(W\) are bound to the same
+values, no matter in which order the three uniﬁcations are done.
+\end{enumerate}
+\end{document}
+
