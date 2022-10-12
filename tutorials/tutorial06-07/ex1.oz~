@@ -1,0 +1,19 @@
+% 1. Making Length Tail-Recursive
+
+% Length of List recursive def
+declare
+fun {Length Xs}
+   case Xs of nil then 0
+   [] X|X1 then 1+{Length X1}
+   end
+end
+
+% Length of List iterative (making tail-recursive)
+fun {LengthTR Xs U}
+   case Xs of nil then U
+   [] X|X1 then {LengthTR X1 U+1}
+   end
+end
+
+
+{Browse {LengthTR [1 2 3 4 5 6 7 8 9 0] 0}}
