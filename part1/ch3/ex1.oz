@@ -8,7 +8,7 @@
 Solution:
 	  
    Real Numbers - all rational and irrational numbers.
-   Simplest fix would be to use float numbers if we want to combine both int and float
+   Simplest fix would be to use float numbers. If we want to combine both int and float
    we have to use conditionals */
 
 local
